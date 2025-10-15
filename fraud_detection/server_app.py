@@ -5,7 +5,7 @@ from flwr.app import ArrayRecord, ConfigRecord, Context
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg
 
-from fraud_detection.task import Net, load_global_data
+from fraud_detection.task import Net
 
 app = ServerApp()
 
@@ -17,7 +17,6 @@ def main(grid:Grid, context:Context):
   lr:float = context.run_config["lr"]
 
   global_model = Net()
-  load_global_data()
 
   arrays = ArrayRecord(global_model.state_dict())
 

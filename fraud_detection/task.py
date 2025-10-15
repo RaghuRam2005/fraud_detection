@@ -9,30 +9,26 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset, Subset
 from sklearn.preprocessing import StandardScaler
 
-X_data, y_data = None, None
-
-def load_global_data():
-    DATA_PATH = "C:\Users\lingu\study\projects\fraud-detection\data"
+def load_data(partition_id: int, num_partitions: int, batch_size=64):
+    DATA_PATH = "/content/creditcard.csv"
     if not os.path.exists(DATA_PATH):
         raise FileNotFoundError("creditcard.csv not found. Please download it and place it in the correct directory.")
 
+    # Load and preprocess dataset
     df = pd.read_csv(DATA_PATH)
-    global X_data, y_data
-    if X_data is not None:
-        return
-    
     X = df.drop(columns=["Class"]).values
     y = df["Class"].values
+
     scaler = StandardScaler()
     X = scaler.fit_transform(X)
-    X_data = torch.tensor(X, dtype=torch.float32).unsqueeze(1)
-    y_data = torch.tensor(y, dtype=torch.float32).unsqueeze(1)
-    print("Global dataset loaded and preprocessed.")
 
-def load_data(partition_id: int, num_partitions: int, batch_size=64):
-    dataset = TensorDataset(X_data, y_data)
+    X_tensor = torch.tensor(X, dtype=torch.float32).unsqueeze(1)
+    y_tensor = torch.tensor(y, dtype=torch.float32).unsqueeze(1)
+
+    dataset = TensorDataset(X_tensor, y_tensor)
     total_size = len(dataset)
     
+    # Partition data
     partition_size = total_size // num_partitions
     start = partition_id * partition_size
     end = total_size if partition_id == num_partitions - 1 else start + partition_size
@@ -40,12 +36,14 @@ def load_data(partition_id: int, num_partitions: int, batch_size=64):
     partition_indices = list(range(start, end))
     partition_dataset = Subset(dataset, partition_indices)
     
+    # Split into train/test sets
     train_size = int(0.8 * len(partition_dataset))
     test_size = len(partition_dataset) - train_size
     train_dataset, test_dataset = torch.utils.data.random_split(partition_dataset, [train_size, test_size])
     
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    
     return train_loader, test_loader
 
 class Net(nn.Module):

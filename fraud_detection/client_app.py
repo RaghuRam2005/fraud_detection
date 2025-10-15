@@ -31,8 +31,8 @@ def train(msg:Message, context:Context):
 
   model_record = ArrayRecord(model.state_dict())
   metrics = {
-      "train_loss":train_loss,
-      "num_examples":len(trainloader.dataset),
+      "train-loss":train_loss,
+      "num-examples":len(trainloader.dataset),
   }
   metrics_record = MetricRecord(metrics)
   content = RecordDict({"arrays":model_record, "metrics":metrics_record})
@@ -45,8 +45,8 @@ def evaluate(msg:Message, context:Context):
   device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
   model.to(device)
 
-  partition_id = context.node_config["partition_id"]
-  num_partitions = context.node_config["num_partitions"]
+  partition_id = context.node_config["partition-id"]
+  num_partitions = context.node_config["num-partitions"]
   _, valloader = load_data(partition_id, num_partitions)
 
   eval_loss, eval_acc = test_fn(
@@ -56,9 +56,9 @@ def evaluate(msg:Message, context:Context):
   )
 
   metrics = {
-      "eval_loss" : eval_loss,
-      "eval_acc" : eval_acc,
-      "num_examples" : len(valloader.dataset),
+      "eval-loss" : eval_loss,
+      "eval-acc" : eval_acc,
+      "num-examples" : len(valloader.dataset),
   }
 
   metric_record = MetricRecord(metrics)
