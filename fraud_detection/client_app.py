@@ -17,8 +17,8 @@ def train(msg:Message, context:Context):
   device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
   model.to(device)
 
-  partition_id = context.node_config["partition_id"]
-  num_partitions = context.node_config["num_partitions"]
+  partition_id = context.node_config["partition-id"]
+  num_partitions = context.node_config["num-partitions"]
   trainloader, _ = load_data(partition_id, num_partitions)
 
   train_loss = train_fn(
