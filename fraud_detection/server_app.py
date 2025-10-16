@@ -2,16 +2,14 @@
 
 import torch
 import wandb
-from typing import Iterable, Optional, Tuple
-from flwr.common.typing import MetricRecord
-from flwr.app import ArrayRecord, ConfigRecord, Context, Message
+from typing import Iterable, Optional
+from flwr.app import ArrayRecord, ConfigRecord, Context, Message, MetricRecord
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg
 
 from fraud_detection.task import Net
 
 app = ServerApp()
-
 
 class CustomFedAvg(FedAvg):
     """Custom FedAvg strategy to log metrics to Weights & Biases."""
