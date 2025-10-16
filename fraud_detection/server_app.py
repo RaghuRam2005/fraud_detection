@@ -76,3 +76,5 @@ def main(grid:Grid, context:Context):
     print("saving final model")
     state_dict = result.arrays.to_torch_state_dict()
     torch.save(state_dict, "final_model.pth")
+
+    wandb.finish()
