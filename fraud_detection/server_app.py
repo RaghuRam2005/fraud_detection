@@ -34,24 +34,29 @@ class CustomFedAvg(FedAvg):
 
 @app.main()
 def main(grid:Grid, context:Context):
+    wandb.init(
+        project="flower-fraud-detection",
+        name=f"run-{context.run_id}",
+        config=context.run_config,
+    )
 
-  fraction_train:float = context.run_config["fraction-train"]
-  num_rounds:int = context.run_config["num-server-rounds"]
-  lr:float = context.run_config["lr"]
+    fraction_train:float = context.run_config["fraction-train"]
+    num_rounds:int = context.run_config["num-server-rounds"]
+    lr:float = context.run_config["lr"]
 
-  global_model = Net()
+    global_model = Net()
 
-  arrays = ArrayRecord(global_model.state_dict())
+    arrays = ArrayRecord(global_model.state_dict())
 
-  strategy = FedAvg(fraction_train=fraction_train)
+    strategy = CustomFedAvg(fraction_train=fraction_train)
 
-  result = strategy.start(
-      grid=grid,
-      initial_arrays=arrays,
-      train_config=ConfigRecord({"lr":lr}),
-      num_rounds=num_rounds,
-  )
+    result = strategy.start(
+        grid=grid,
+        initial_arrays=arrays,
+        train_config=ConfigRecord({"lr":lr}),
+        num_rounds=num_rounds,
+    )
 
-  print("saving final model")
-  state_dict = result.arrays.to_torch_state_dict()
-  torch.save(state_dict, "final_model.pth")
+    print("saving final model")
+    state_dict = result.arrays.to_torch_state_dict()
+    torch.save(state_dict, "final_model.pth")
