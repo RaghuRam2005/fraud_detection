@@ -35,9 +35,9 @@ clientapp = "fraud_detection.client_app:app"
 
 # Custom config values accessible via `context.run_config`
 [tool.flwr.app.config]
-num-server-rounds = 20
+num-server-rounds = 15
 fraction-train = 0.7
-local-epochs = 30
+local-epochs = 10
 lr = 0.01
 
 # Default federation to use when running the app
@@ -46,7 +46,9 @@ default = "local-simulation"
 
 # Local simulation federation with 10 virtual SuperNodes
 [tool.flwr.federations.local-simulation]
-options.num-supernodes = 10
+options.num-supernodes = 5
+options.backend.client-resources.num-cpus = 1
+options.backend.client-resources.num-gpus = 0.5
 
 # Remote federation example for use with SuperLink
 [tool.flwr.federations.remote-federation]
