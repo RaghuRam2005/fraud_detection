@@ -60,34 +60,61 @@ class Net(nn.Module):
 
 def train(model, trainloader, epochs, lr, device):
     model.to(device)
-    criterion = nn.BCELoss().to(device)
+    criterion = nn.BCELoss()
     optimizer = optim.Adam(model.parameters(), lr=lr)
     model.train()
-    running_loss=0.0
-    for _ in range(epochs):
-      for batch in trainloader:
-        inputs, labels = batch
-        inputs, labels = inputs.to(device), labels.to(device)
-        optimizer.zero_grad()
-        loss = criterion(model(inputs), labels)
-        loss.backward()
-        optimizer.step()
-        running_loss += loss.item()
-    avg_trainloss = running_loss / len(trainloader)
-    return avg_trainloss
+    loss_list = []
+
+    for epoch in range(epochs):
+        running_loss = 0.0
+        total_samples = 0
+
+        for inputs, labels in trainloader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            labels = labels.view(-1, 1) 
+
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimizer.step()
+
+            # accumulate total loss weighted by batch size
+            batch_size = labels.size(0)
+            running_loss += loss.item() * batch_size
+            total_samples += batch_size
+
+        avg_trainloss = running_loss / total_samples
+        print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_trainloss:.4f}")
+        loss_list.append(avg_trainloss)
+        
+    return loss_list
 
 def test(model, testloader, device):
     model.to(device)
-    criterion = nn.BCELoss().to(device)
-    correct, loss = 0, 0
+    model.eval()
+    criterion = nn.BCELoss()
+
+    total_loss = 0.0
+    correct = 0
+    total_samples = 0
+
     with torch.no_grad():
-        for batch in testloader:
-            inputs, labels = batch
+        for inputs, labels in testloader:
             inputs, labels = inputs.to(device), labels.to(device)
+            labels = labels.view(-1, 1)  
+
             outputs = model(inputs)
-            loss += criterion(outputs, labels).item()
+            loss = criterion(outputs, labels)
+
+            batch_size = labels.size(0)
+            total_loss += loss.item() * batch_size
+
             predicted = (outputs > 0.5).float()
             correct += (predicted == labels).sum().item()
-    accuracy = correct / len(testloader.dataset)
-    avg_loss = loss / len(testloader)
+            total_samples += batch_size
+
+    avg_loss = total_loss / total_samples
+    accuracy = correct / total_samples
+
     return avg_loss, accuracy

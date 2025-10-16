@@ -31,7 +31,8 @@ def train(msg:Message, context:Context):
 
   model_record = ArrayRecord(model.state_dict())
   metrics = {
-      "train-loss":train_loss,
+      "train-loss":train_loss[-1],
+      "loss-history":train_loss,
       "num-examples":len(trainloader.dataset),
   }
   metrics_record = MetricRecord(metrics)
