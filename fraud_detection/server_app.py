@@ -1,7 +1,8 @@
 """fraud-detection: A Flower / PyTorch app."""
 
 import torch
-from typing import Iterable, Optional
+import wandb
+from typing import Iterable, Optional, Tuple
 from flwr.app import ArrayRecord, ConfigRecord, Context, Message, MetricRecord
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg
@@ -11,32 +12,25 @@ from fraud_detection.task import Net
 
 app = ServerApp()
 
-def plot_loss_curve(loss_list):
-    plt.figure(figsize=(8, 5))
-    plt.plot(range(1, len(loss_list) + 1), loss_list, marker='o', linestyle='-', linewidth=2)
-    plt.title("Training Loss per Epoch")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.grid(True)
-    plt.show()
-
-
 class CustomFedAvg(FedAvg):
-  def aggregate_train(
+  def aggregate_evaluate(
         self,
         server_round: int,
         replies: Iterable[Message],
-    ) -> tuple[Optional[ArrayRecord], Optional[MetricRecord]]:
-        """Aggregate ArrayRecords and MetricRecords in the received Messages."""
+    ) -> Tuple[Optional[float], MetricRecord]:
+        """Aggregate evaluation losses and log them."""
 
-        for reply in replies:
-            if reply.has_content():
-                # Retrieve the ConfigRecord from the message
-                train_losses = reply.content["loss-history"]
-                plot_loss_curve(train_losses)
-                
-        # Aggregate the ArrayRecords and MetricRecords as usual
-        return super().aggregate_train(server_round, replies)
+        # Get the aggregated loss from the super class
+        aggregated_loss, aggregated_metrics = super().aggregate_evaluate(server_round, replies)
+
+        if aggregated_loss is not None:
+            print(f"Round {server_round}: Aggregated evaluation loss = {aggregated_loss}")
+            # Store the aggregated loss
+            self.round_losses.append(aggregated_loss)
+            # Log to Weights & Biases
+            wandb.log({"round": server_round, "aggregated_loss": aggregated_loss})
+
+        return aggregated_loss, aggregated_metrics
 
 @app.main()
 def main(grid:Grid, context:Context):
