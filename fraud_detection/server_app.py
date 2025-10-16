@@ -2,58 +2,70 @@
 
 import torch
 import wandb
-from typing import Iterable, Optional, Tuple, List
-from flwr.app import ArrayRecord, ConfigRecord, Context, Message, MetricRecord
+from typing import Iterable, Optional, Tuple
+from flwr.common.typing import MetricRecord
+from flwr.app import ArrayRecord, ConfigRecord, Context, Message
 from flwr.serverapp import Grid, ServerApp
 from flwr.serverapp.strategy import FedAvg
-import matplotlib.pyplot as plt
 
 from fraud_detection.task import Net
 
 app = ServerApp()
 
+
 class CustomFedAvg(FedAvg):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.round_losses: List[float] = []
-        self.round_accuracies: List[float] = [] # <-- Add a list for accuracies
+    """Custom FedAvg strategy to log metrics to Weights & Biases."""
+
+    def aggregate_train(
+        self,
+        server_round: int,
+        replies: Iterable[Message],
+    ) -> tuple[Optional[ArrayRecord], Optional[MetricRecord]]:
+        """Aggregate model updates and log client-side training loss."""
+        for reply in replies:
+            if reply.has_content() and "metrics" in reply.content:
+                node_id = reply.metadata.node_id
+                train_loss = reply.content["metrics"]["train-loss"]
+                print(f"Round {server_round} | Client {node_id} | Train Loss: {train_loss:.4f}")
+                wandb.log({
+                    f"train_loss_client_{node_id}": train_loss,
+                    "round": server_round
+                })
+        return super().aggregate_train(server_round, replies)
 
     def aggregate_evaluate(
         self,
         server_round: int,
         replies: Iterable[Message],
-    ) -> Tuple[Optional[float], MetricRecord]:
-        """Aggregate evaluation losses and accuracies, then log them."""
+    ) -> Optional[MetricRecord]:
+        """Aggregate evaluation results and log the aggregated metrics."""
 
-        # Get the aggregated loss and metrics from the super class
-        aggregated_loss, aggregated_metrics = super().aggregate_evaluate(server_round, replies)
+        aggregated_results = super().aggregate_evaluate(server_round, replies)
 
-        # The aggregated accuracy is in the metrics dictionary
-        # FedAvg by default names the aggregated accuracy metric 'accuracy'
-        aggregated_accuracy = aggregated_metrics.get("accuracy")
+        if aggregated_results is not None:
+            aggregated_loss = aggregated_results["eval-loss"]
+            aggregated_accuracy = aggregated_results["eval-acc"]
 
-        log_dict = {"round": server_round}
-        
-        if aggregated_loss is not None:
-            print(f"Round {server_round}: Aggregated loss = {aggregated_loss}")
-            self.round_losses.append(aggregated_loss)
-            log_dict["aggregated_loss"] = aggregated_loss
+            log_dict = {
+                "round": server_round,
+                "aggregated_eval_loss": aggregated_loss,
+                "aggregated_eval_accuracy": aggregated_accuracy,
+            }
 
-        if aggregated_accuracy is not None:
-            print(f"Round {server_round}: Aggregated accuracy = {aggregated_accuracy}")
-            self.round_accuracies.append(aggregated_accuracy)
-            log_dict["aggregated_accuracy"] = aggregated_accuracy
+            print(f"Round {server_round} | Aggregated Eval Loss: {aggregated_loss:.4f} | Aggregated Eval Accuracy: {aggregated_accuracy:.4f}")
+            wandb.log(log_dict)
 
-        # Log both metrics to Weights & Biases in a single step
-        wandb.log(log_dict)
+        return aggregated_results
 
-        return aggregated_loss, aggregated_metrics
+
 @app.main()
 def main(grid:Grid, context:Context):
+    """Main function to run the federated learning experiment."""
     wandb.init(
         project="flower-fraud-detection",
         name=f"run-{context.run_id}",
         config=context.run_config,
+        define_metric="round/*",
     )
 
     fraction_train:float = context.run_config["fraction-train"]
@@ -61,10 +73,12 @@ def main(grid:Grid, context:Context):
     lr:float = context.run_config["lr"]
 
     global_model = Net()
-
     arrays = ArrayRecord(global_model.state_dict())
 
-    strategy = CustomFedAvg(fraction_train=fraction_train)
+    strategy = CustomFedAvg(
+        fraction_train=fraction_train,
+        fit_metrics_aggregation_fn=lambda metrics: metrics[0][1],
+    )
 
     result = strategy.start(
         grid=grid,
@@ -73,7 +87,7 @@ def main(grid:Grid, context:Context):
         num_rounds=num_rounds,
     )
 
-    print("saving final model")
+    print("Saving final model...")
     state_dict = result.arrays.to_torch_state_dict()
     torch.save(state_dict, "final_model.pth")
 
